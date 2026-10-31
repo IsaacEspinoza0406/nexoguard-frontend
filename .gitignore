@@ -1,0 +1,32 @@
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log
+
+# Credenciales y claves privadas
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials*.json
+secrets/
+
+# Cachés, temporales y respaldos
+.swc/
+.cache/
+.turbo/
+*.tmp
+*.temp
+backups/
+*.bak
+*.backup
+*.dump
+*.sql.gz
+*.sql.zip
