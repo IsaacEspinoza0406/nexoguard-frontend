@@ -4,6 +4,8 @@ NexoGuard es un proyecto destinado a ayudar a propietarios de sitios web a revis
 
 La aplicación utiliza Next.js, React, TypeScript y Tailwind CSS. La página inicial permite registrar una cuenta mediante la API local; todavía no implementa inicio de sesión ni otras funcionalidades de negocio.
 
+El [backend complementario](https://github.com/IsaacEspinoza0406/nexoguard-backend) proporciona la API NestJS y la persistencia Prisma/MySQL. El registro se probó de extremo a extremo en Docker local con datos ficticios y limpieza posterior.
+
 ## Estructura
 
 ```text
@@ -18,7 +20,7 @@ En la raíz se encuentran las configuraciones de Next.js, TypeScript, ESLint, Je
 
 ## Instalación y ejecución
 
-Con Node.js 24 y npm disponibles, desde este directorio:
+Con Node.js 24, npm y el backend local configurado y en ejecución, desde este directorio:
 
 ```bash
 npm ci
