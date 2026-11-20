@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
 type Errors = { email?: string; password?: string; confirmation?: string };
@@ -53,7 +54,7 @@ export default function Home() {
       </section>
       <section className="form-area" aria-labelledby="form-title">
         <div className="form-card"><p className="step">TU CUENTA EN NEXOGUARD</p><h2 id="form-title">Crear cuenta</h2><p className="description">Da el primer paso para conocer el estado de seguridad de tus sitios.</p>
-          {success ? <div className="success" role="status"><strong>Cuenta creada correctamente.</strong><p>Tu registro se completó. El inicio de sesión estará disponible más adelante.</p><button className="text-button" type="button" onClick={() => setSuccess(false)}>Registrar otra cuenta</button></div> :
+          {success ? <div className="success" role="status"><strong>Cuenta creada correctamente.</strong><p>Tu registro se completó. Ya puedes <Link className="text-button" href="/login">iniciar sesión</Link>.</p><button className="text-button" type="button" onClick={() => setSuccess(false)}>Registrar otra cuenta</button></div> :
           <form onSubmit={submit} noValidate>
             <div className="field"><label htmlFor="email">Correo electrónico</label><input id="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} placeholder="nombre@ejemplo.com" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-error' : undefined} />{errors.email && <p id="email-error" className="field-error">{errors.email}</p>}</div>
             <div className="field"><label htmlFor="password">Contraseña</label><input id="password" type={visible ? 'text' : 'password'} autoComplete="new-password" required value={password} onChange={e => setPassword(e.target.value)} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-help password-error' : 'password-help'} /><p id="password-help" className="help">Usa entre 12 y 128 caracteres.</p>{errors.password && <p id="password-error" className="field-error">{errors.password}</p>}</div>
@@ -63,6 +64,7 @@ export default function Home() {
             <button className="submit" type="submit" disabled={pending}>{pending ? 'Creando cuenta…' : 'Crear cuenta'} <span aria-hidden="true">→</span></button>
           </form>}
           <p className="footer-note">Tus credenciales se utilizan únicamente para crear tu cuenta.</p>
+          <p className="footer-note">¿Ya tienes cuenta? <Link href="/login" className="text-button">Iniciar sesión</Link></p>
         </div>
       </section>
     </main>
