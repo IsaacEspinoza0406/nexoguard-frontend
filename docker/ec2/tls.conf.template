@@ -1,0 +1,57 @@
+server {
+  listen 8080 default_server;
+  server_name _;
+  location = /health/live { return 200 'ok'; }
+  location / { return 444; }
+}
+server {
+  listen 8080;
+  server_name ${PUBLIC_HOST};
+  location ^~ /.well-known/acme-challenge/ { root /var/www/acme; default_type text/plain; }
+  location = /health/live { return 200 'ok'; }
+  location / { return 308 https://${PUBLIC_HOST}$request_uri; }
+}
+server {
+  listen 8443 ssl default_server;
+  server_name ${PUBLIC_HOST};
+  if ($host != ${PUBLIC_HOST}) { return 444; }
+  ssl_certificate /etc/letsencrypt/live/${PUBLIC_HOST}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${PUBLIC_HOST}/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_session_tickets off;
+  ssl_session_cache shared:TLS:1m;
+  resolver 127.0.0.11 ipv6=off valid=10s;
+  resolver_timeout 3s;
+  add_header Strict-Transport-Security 'max-age=86400' always;
+  add_header X-Content-Type-Options nosniff always;
+  add_header X-Frame-Options DENY always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+  proxy_set_header Host ${PUBLIC_HOST};
+  proxy_set_header X-Forwarded-Host ${PUBLIC_HOST};
+  proxy_set_header X-Forwarded-Proto https;
+  proxy_set_header X-Forwarded-For $remote_addr;
+  proxy_set_header Forwarded '';
+  proxy_set_header Proxy '';
+  proxy_redirect off;
+  proxy_connect_timeout 5s;
+  proxy_read_timeout 55s;
+  proxy_send_timeout 15s;
+  location = /health/live { return 200 'ok'; }
+  location = /health/ready { set $api http://back:3001; proxy_pass $api/health/ready; }
+  # Public ownership proof supplied by Google; no private files in this webroot.
+  location = /google9ba5ca0ab47e9b8d.html {
+    root /var/www/acme/search-console;
+    try_files $uri =404;
+    default_type text/html;
+    expires -1;
+  }
+  location /api/ {
+    set $api http://back:3001;
+    rewrite ^/api/(.*)$ /$1 break;
+    proxy_pass $api;
+    proxy_cookie_path /users /api/users;
+    proxy_no_cache 1;
+    proxy_cache_bypass 1;
+  }
+  location / { set $frontend http://front:3000; proxy_pass $frontend; }
+}
