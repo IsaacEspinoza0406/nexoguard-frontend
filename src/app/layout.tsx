@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = { title: 'NexoGuard' };
+// Nonce CSP requires per-request rendering, never a cached/static nonce.
+export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
