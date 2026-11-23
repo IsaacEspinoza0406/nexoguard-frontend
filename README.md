@@ -128,3 +128,9 @@ El gateway de EC2 se construye con [docker/Dockerfile.ec2-gateway](./docker/Dock
 - No se presentan recuperación de contraseña por interfaz, administración de roles o certificación WCAG como funciones completadas. La accesibilidad es un objetivo de diseño, no una certificación.
 - Quedan avisos moderados en herramientas de desarrollo de la cadena ESLint/TypeScript; el despliegue y las pruebas realizadas no sustituyen mantenimiento ni una auditoría completa.
 - **La alerta de Google Safe Browsing continúa pendiente.** Se envió un reporte de posible clasificación incorrecta, sin resolución confirmada. HTTPS y el rediseño no la resuelven; no se recomienda ignorar advertencias ni desactivar protecciones.
+
+## Licencia
+
+El código original de NexoGuard se distribuye bajo [Apache License 2.0](./LICENSE).
+Copyright 2026 Héctor Isaac Espinoza Mendoza. Consulte también [NOTICE](./NOTICE).
+Las dependencias y los componentes de terceros conservan sus respectivos avisos y licencias.
