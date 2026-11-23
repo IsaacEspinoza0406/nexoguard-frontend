@@ -1,73 +1,130 @@
 # NexoGuard — Frontend
 
-NexoGuard es un proyecto destinado a ayudar a propietarios de sitios web a revisar aspectos observables de seguridad y comprender los hallazgos. Este frontend será la interfaz para consultar y gestionar esas revisiones.
+NexoGuard es una aplicación universitaria de revisión de seguridad web para propietarios de sitios. Permite acreditar control de un dominio, consultar análisis de su página principal y entender evidencia y recomendaciones. Una comprobación aprobada no garantiza que un sitio carezca de vulnerabilidades.
 
-La aplicación utiliza Next.js, React, TypeScript y Tailwind CSS. Permite registro (`/`), inicio de sesión (`/login`) y acceso a la cuenta privada con cierre de sesión (`/cuenta`). Next.js consulta al backend desde el servidor antes de renderizar el área privada; no basta con que exista una cookie.
+- **Aplicación desplegada:** https://nexoguard.duckdns.org
+- **Backend complementario:** https://github.com/IsaacEspinoza0406/nexoguard-backend
 
-El [backend complementario](https://github.com/IsaacEspinoza0406/nexoguard-backend) proporciona la API NestJS y la persistencia Prisma/MySQL. El registro se probó de extremo a extremo en Docker local con datos ficticios y limpieza posterior.
+## Funcionalidades implementadas
 
-## Estructura
+- Registro, login, acceso privado y logout mediante la API NestJS. Las credenciales pertenecen a NexoGuard, no a Google u otros servicios.
+- Dashboard de sitios propios, registro de dominios y estado de propiedad.
+- Verificación guiada: generar el desafío, descargar el archivo, publicarlo y comprobarlo. El código permanece en el panel; no se coloca en notificaciones ni almacenamiento persistente del navegador.
+- Inicio de análisis manual, consulta de estado, resultados con evidencia y recomendaciones, historial y comparación entre análisis compatibles del mismo sitio y revisión de dominio.
+- Configuración diaria o semanal por activación expresa del propietario; consulta y lectura de alertas dentro de la aplicación.
+- Informes complementarios de SSL Labs con procedencia, fecha, estados y notas del proveedor, separados de las comprobaciones propias. Las solicitudes externas requieren consentimiento; leer un informe conservado no inicia otra evaluación.
+- Interfaz oscura adaptable a móvil y escritorio, navegación por teclado, controles para mostrar contraseñas, estados de carga y feedback junto a las acciones. Notificaciones compartidas de progreso, éxito, información y error, con cierre accesible y respeto de movimiento reducido.
+
+Las notificaciones de éxito esperan confirmación de la API. Los errores que necesitan intervención permanecen también junto al campo o acción; no se sustituyen por un aviso temporal. El frontend no inventa métricas ni trata `NO_EVALUADO` como aprobado.
+
+## Stack y estructura
+
+Next.js 16.4.6 con App Router, React 19, TypeScript y Tailwind CSS 4. Se utilizan estilos y componentes propios sin fuentes remotas ni servicios de analítica añadidos. Jest, Testing Library, ESLint y TypeScript proporcionan la validación automatizada.
 
 ```text
-src/app/
-  layout.tsx       Diseño raíz y metadatos
-  page.tsx         Formulario de registro y comunicación con la API
-  page.test.tsx    Pruebas del formulario con API simulada
-  globals.css      Estilos globales y Tailwind
-  login/           Pantalla de acceso y pruebas
-  cuenta/          Página privada, logout y gestor de sitios/verificación
-src/lib/           Cliente de API con credenciales y CSRF
+src/
+  app/
+    layout.tsx             Diseño raíz y proveedor de notificaciones
+    globals.css            Sistema visual compartido
+    page.tsx               Registro
+    login/                 Inicio de sesión
+    cuenta/                Dashboard, sitios, análisis y monitoreo
+  components/              Identidad visual, acceso y notificaciones
+  lib/                     API, credenciales/CSRF y política CSP
+  proxy.ts                 CSP de producción y nonce por respuesta
+docker/                    Gateway Nginx y plantillas
+Dockerfile                 Imagen de Next.js
 ```
 
-En la raíz se encuentran las configuraciones de Next.js, TypeScript, ESLint, Jest y PostCSS, además del Dockerfile. `NEXT_PUBLIC_API_URL` identifica la URL pública para el navegador y por defecto es `http://127.0.0.1:3001`. Nunca incluyas secretos en variables `NEXT_PUBLIC_`, pues se exponen al navegador.
+Las pruebas se mantienen junto a componentes y módulos. La API y las reglas de negocio pertenecen al backend; los botones deshabilitados no sustituyen la autorización del servidor.
 
-## Instalación y ejecución
+## Requisitos y configuración local
 
-Con Node.js 24, npm y el backend local configurado y en ejecución, desde este directorio:
+Se requieren Node.js 24 y npm. Para el flujo completo se necesita el backend complementario en ejecución, con MySQL configurado y migraciones aplicadas de forma explícita. Docker con contenedores Linux es necesario únicamente si se construyen o ejecutan imágenes.
 
-```bash
+Desde este repositorio, en PowerShell:
+
+```powershell
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
 npm ci
 npm run dev
 ```
 
-La página se sirve en `http://127.0.0.1:3000`. Para generar y ejecutar una compilación de producción se pueden usar `npm run build` y `npm start`.
+La [plantilla pública](./.env.example) contiene únicamente configuración de ejemplo. Edita el archivo privado creado según el entorno:
 
-## Docker y validación
+| Variable | Uso local | Alcance |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:3001` | URL de la API que utiliza el navegador; queda incorporada durante el build. |
+| `API_INTERNAL_URL` | `http://127.0.0.1:3001` | URL que utiliza únicamente el servidor Next.js para comprobar sesiones. |
 
-El Dockerfile incorpora `NEXT_PUBLIC_API_URL` durante la compilación. Compose fija la URL local para el navegador. Si se modifica, es necesario reconstruir la imagen; el hostname interno `back` no es accesible desde el navegador. `API_INTERNAL_URL`, exclusiva del servidor y configurable en ejecución, se establece como `http://back:3001` en Docker y usa `http://127.0.0.1:3001` por defecto fuera de Docker. El backend local solo acepta el origen `http://127.0.0.1:3000`; utiliza esa dirección y no `localhost`.
+Abre **http://127.0.0.1:3000**. El modo local del backend permite ese origen exacto: no intercambiarlo por `localhost`. Si Next.js se ejecuta dentro de Docker, la dirección interna puede ser `http://back:3001` cuando ese sea el nombre del servicio en la red compartida. El navegador no puede resolver ese nombre Docker.
 
-Login y logout obtienen primero `/auth/csrf`, envían cookies con `credentials: 'include'` y el token en `X-CSRF-Token`. No guardan tokens ni contraseñas en almacenamiento local. En producción se requiere HTTPS y frontend/API bajo un mismo hostname para el renderizado autenticado; las cookies son host-only. El contrato detallado se documenta en el backend, en `AUTH.md`. La configuración Docker/MySQL actual sigue destinada a desarrollo local.
+No incluyas secretos en `NEXT_PUBLIC_`: sus valores son públicos. Este repositorio no necesita `DATABASE_URL`, contraseñas MySQL, claves CSRF del backend ni credenciales de SSL Labs. Los archivos `.env` reales y certificados privados no deben publicarse ni copiarse a la imagen.
 
-Las comprobaciones configuradas son:
+Para compilar y ejecutar localmente en modo producción:
 
-```bash
+```powershell
+npm run build
+npm start
+```
+
+Las variables públicas deben estar definidas **antes de compilar**; cambiarlas solo al arrancar no actualiza el JavaScript enviado al navegador. El comando `start` escucha en la interfaz local por defecto. El área privada necesita un servidor Next.js activo: no se entrega como una exportación HTML estática.
+
+## Rutas y flujo de uso
+
+| Ruta | Pantalla |
+| --- | --- |
+| `/` | Registro de cuenta |
+| `/login` | Inicio de sesión |
+| `/cuenta` | Área privada: sitios, propiedad, resultados, historial, comparación, programación y alertas |
+
+1. Crea una cuenta con correo y contraseña de 12 a 128 caracteres. La confirmación se valida solo en el frontend y no se envía a la API. Registrarse no inicia sesión automáticamente.
+2. Inicia sesión y registra un dominio que administras, sin protocolo, puerto ni ruta.
+3. Cuando puedas publicar, genera el desafío y descarga `nexoguard-verification.txt`. Colócalo en `/.well-known/nexoguard-verification.txt` del sitio y publica la versión. Debe responder por HTTPS válido sin redirecciones. Solo después solicita la comprobación.
+4. El desafío caduca a los 30 minutos y la propiedad a los 30 días. Cada subdominio requiere su propia prueba; renovar invalida la anterior. Si se pierde el código al salir de la pantalla, debe generarse otro.
+5. Con propiedad vigente, solicita un análisis manual, consulta sus resultados e historial y compara dos análisis de la misma revisión. La programación es opcional y requiere activación expresa. Guardarla no demuestra que ya haya ocurrido una ejecución automática.
+
+Next.js valida la sesión con NestJS antes de renderizar `/cuenta`; la mera presencia de una cookie no concede acceso. El servidor sigue comprobando propiedad y autorización en cada operación.
+
+## Comunicación y seguridad
+
+El registro obtiene su token mediante `GET /users/registration-token`. Login y operaciones autenticadas utilizan `GET /auth/csrf`. Las mutaciones envían cookies con `credentials: 'include'`, origen permitido y `X-CSRF-Token`; tras login se obtiene un token ligado a la sesión actual. Contraseñas, cookies y tokens no se guardan en `localStorage` ni se muestran en toasts.
+
+En producción se conservan cookies Secure, HttpOnly y SameSite Strict, HTTPS y CSP con nonce por respuesta. Los datos del usuario y del proveedor se renderizan como contenido, sin insertar su HTML. Una sesión caducada exige volver a iniciar sesión; los controles visuales no omiten las validaciones del backend.
+
+## Comandos de validación
+
+Estos scripts existen en [package.json](./package.json):
+
+```powershell
 npm run lint
 npm run typecheck
-npm test
+npm run test
 npm run build
 ```
 
-Las pruebas del formulario simulan la API; no prueban persistencia real. El flujo local obtiene un token CSRF con cookie HttpOnly y envía correo y contraseña con credenciales. No guarda el token ni la contraseña en almacenamiento local.
+Las pruebas de componentes usan respuestas simuladas de la API: comprueban interfaz y comportamiento, no persistencia MySQL, propiedad pública ni un análisis externo real. La última validación del frontend para la publicación aprobó 87 pruebas, lint, tipos y build; esta edición del README no vuelve a ejecutarlos.
 
-## Funcionalidades previstas
+## Docker y despliegue actual en EC2
 
-En `/cuenta` ya se pueden registrar y listar sitios propios, generar o renovar un desafío y solicitar la comprobación de un archivo publicado en `https://<dominio>/.well-known/nexoguard-verification.txt`. El código caduca en 30 minutos; la verificación, en 30 días. Cada subdominio requiere prueba propia. Renovar invalida desafíos y verificaciones anteriores. El código se mantiene solo en memoria de la pantalla; al perderlo se genera otro. El backend comprueba propiedad, CSRF, DNS público y conexión HTTPS sin redirecciones. El contrato y los límites están en `SITES.md` del repositorio backend.
+El [Dockerfile](./Dockerfile) acepta `NEXT_PUBLIC_API_URL` como argumento público de compilación. Para crear la imagen destinada a un proxy de mismo origen:
 
-Las pruebas del gestor usan API simulada y no demuestran DNS público ni persistencia por sí solas. La integración separada del backend usa MySQL real y respuestas DNS/HTTPS controladas, con limpieza exclusiva de sus cuentas ficticias.
+```powershell
+docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_URL=/api -t nexoguard-front:local .
+```
 
-En cada sitio se puede iniciar un análisis manual con propiedad vigente, consultar su estado, los últimos 50 trabajos y sus resultados con evidencia y recomendaciones separadas. El backend valida propietario y revisión actual; el botón no es una barrera de autorización. Se conservan cookies y CSRF. El contrato y las limitaciones están en `ANALYSIS.md` del backend. El ensayo público del motor propio fue completado según evidencia aportada por el propietario; véase el apartado final, sin atribuir observación directa al agente.
+Esta imagen necesita un proxy que dirija `/api/` al backend; el argumento no crea el proxy. Para ejecutar el navegador directamente contra la API local, compila con su URL pública local en lugar de `/api`. `API_INTERNAL_URL` se configura al arrancar el contenedor para SSR y debe ser accesible desde la red de Next.js.
 
-Programación diaria/semanal y alertas en aplicación disponibles, con activación expresa por sitio y aviso inicial a 30 días. SSL Labs complementario muestra estado, fecha y notas del proveedor; su acceso real requiere registro institucional y configuración del backend. La configuración de origen, cookies, proxy y TLS requiere validación del despliegue de producción.
+La aplicación real está publicada en **https://nexoguard.duckdns.org**, sobre AWS EC2 Ubuntu 24.04 LTS x86_64 con Docker Compose. Nginx termina HTTPS con certificado renovable y redirección desde HTTP, sirve el frontend en `/` y la API en `/api/`. La imagen pública utiliza `NEXT_PUBLIC_API_URL=/api`; el servidor Next.js utiliza `API_INTERNAL_URL=http://back:3001` en la red interna. Next.js, NestJS y MySQL no publican sus puertos directamente a Internet.
 
-La comparación por comprobación y el catálogo completo de recomendaciones se describen en [COMPARISONS.md](../back/COMPARISONS.md). No se calculan puntuaciones globales ni se atribuyen mejoras a datos no evaluados.
+El gateway de EC2 se construye con [docker/Dockerfile.ec2-gateway](./docker/Dockerfile.ec2-gateway) y sus [plantillas](./docker/ec2/). La orquestación completa y la configuración privada se administran separadamente, fuera de los repositorios de aplicación; construir esta imagen no despliega toda la plataforma. Los cambios de frontend se publican conservando una imagen anterior para reversión, sin necesidad de reiniciar MySQL.
 
-Contrato, migración, política aprobada y comprobaciones de programación/alertas: [MONITORING.md](../back/MONITORING.md).
+## Límites y pendientes
 
-Integración externa, consentimiento, configuración privada y límites: [SSL-LABS.md](../back/SSL-LABS.md).
-
-
-## Evidencia pública y cierre académico
-
-Actualización del 20/11/2026: el propietario aportó evidencia del ensayo público completado en nexoguard-prueba-243751.pages.dev: propiedad verificada, análisis inicial 15:27:05, publicación corregida y segundo análisis observado 15:34:14 (8 APROBADO, 3 NO_APLICABLE y CSP presente pero NO_EVALUADO). Comparación: 2 mejoras (HSTS y protección frente a marcos), 6 aprobadas sin cambios, 4 no comparables y ninguna regresión. Es evidencia aportada por el propietario, no observación directa del agente. Detalle y límites en [matriz de validación](../docs/MATRIZ_VALIDACION.md).
-
-SSL Labs real completado con cuatro endpoints A; el propietario confirmó su conservación visual y desaparición del aviso tras actualizar frontend. Programación diaria configurada no equivale a ejecución automática real observada; esa ejecución sigue pendiente. No se declara el sistema listo para producción.
+- El motor observa la página principal de sitios propios verificados; no realiza una auditoría integral ni pruebas ofensivas. No ofrece garantías de seguridad absoluta.
+- Los resultados distinguen hallazgos, aprobados, no aplicables y no evaluados. Una CSP presente queda `NO_EVALUADO`; no se inventan puntuaciones globales ni mejoras a partir de errores de conexión.
+- SSL Labs es complementario y depende del proveedor y de configuración privada del backend. Su nota no equivale a una aprobación del motor propio. Un fallo de actualización se distingue del informe conservado.
+- Las alertas solo se muestran dentro de la aplicación; no son correos ni vigilancia continua. La ejecución programada requiere el backend activo y propiedad vigente.
+- No se presentan recuperación de contraseña por interfaz, administración de roles o certificación WCAG como funciones completadas. La accesibilidad es un objetivo de diseño, no una certificación.
+- Quedan avisos moderados en herramientas de desarrollo de la cadena ESLint/TypeScript; el despliegue y las pruebas realizadas no sustituyen mantenimiento ni una auditoría completa.
+- **La alerta de Google Safe Browsing continúa pendiente.** Se envió un reporte de posible clasificación incorrecta, sin resolución confirmada. HTTPS y el rediseño no la resuelven; no se recomienda ignorar advertencias ni desactivar protecciones.
