@@ -1,3 +1,4 @@
+import { NotificationsProvider } from '../../components/notifications';
 import { fireEvent, render, screen } from '@testing-library/react';
 import Login from './page';
 
@@ -27,4 +28,12 @@ it.each([401, 403, 429, 500])('informa un fallo %s sin navegar', async status =>
   global.fetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ token: 'token' }) }).mockResolvedValueOnce({ ok: false, status });
   render(<Login />); fill(); fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
   expect(await screen.findByRole('alert')).toBeInTheDocument(); expect(replace).not.toHaveBeenCalled();
+});
+
+it('solo anuncia el acceso después de una respuesta de login satisfactoria', async () => {
+  global.fetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ token: 'csrf-fixture' }) }).mockResolvedValueOnce({ ok: true, status: 200 });
+  render(<NotificationsProvider><Login /></NotificationsProvider>); fill(); fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+  expect(screen.getByText('Comprobando tu acceso a NexoGuard…')).toBeInTheDocument();
+  expect(await screen.findByText('Sesión iniciada. Bienvenido a tu espacio de trabajo.')).toBeInTheDocument();
+  expect(replace).toHaveBeenCalledWith('/cuenta');
 });

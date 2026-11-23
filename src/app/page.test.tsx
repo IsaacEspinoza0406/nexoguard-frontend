@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { NotificationsProvider } from '../components/notifications';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Home from './page';
 
 const fill = (email = 'user@example.com', password = 'contraseña-segura', confirmation = password) => {
@@ -60,4 +61,16 @@ it('informa fallos de red y de obtención del token', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo conectar/i); unmount();
   global.fetch = jest.fn().mockResolvedValueOnce({ ok: false, status: 403 });
   render(<Home />); fill(); submit(); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/verificar la seguridad/i));
+});
+
+it('anuncia progreso pero no éxito hasta que el registro sea confirmado por la API', async () => {
+  let finish!: (response: object) => void;
+  global.fetch = jest.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ token: 'csrf-fixture' }) }).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  render(<NotificationsProvider><Home /></NotificationsProvider>); fill(); submit();
+  expect(await screen.findByText('Creando tu cuenta de NexoGuard…')).toBeInTheDocument();
+  expect(screen.queryByText('Cuenta creada. Ya puedes iniciar sesión en NexoGuard.')).not.toBeInTheDocument();
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2)); fireEvent.click(screen.getByRole('button', { name: /creando cuenta/i })); expect(fetch).toHaveBeenCalledTimes(2);
+  await act(async () => { finish({ status: 201, json: async () => ({ id: 'fixture' }) }); });
+  expect(await screen.findByText('Cuenta creada. Ya puedes iniciar sesión en NexoGuard.')).toBeInTheDocument();
+  expect(screen.queryByText('Creando tu cuenta de NexoGuard…')).not.toBeInTheDocument();
 });
