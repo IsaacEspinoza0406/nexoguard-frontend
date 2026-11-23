@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { NotificationsProvider } from '../../components/notifications';
+import { within, act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import MonitoringPanel from './monitoring-panel';
 import { csrfMutation, getSiteMonitoring } from '../../lib/auth-api';
 const router = { replace: jest.fn() };
@@ -42,4 +43,15 @@ it.each([[403, 'CSRF'], [409, 'Verifica la revisión'], [429, 'Demasiadas solici
 it('maneja errores de red y sesión caducada sin mostrar detalles internos', async () => {
   get.mockRejectedValueOnce(new Error('private')); open(); expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar'); expect(screen.queryByText('private')).not.toBeInTheDocument();
   get.mockResolvedValue({ status: 401 }); fireEvent.click(screen.getByRole('button', { name: 'Ocultar programación y alertas' })); fireEvent.click(screen.getByRole('button', { name: 'Programación y alertas' })); await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/login'));
+});
+
+it('no anuncia guardado de programación mientras la API sigue pendiente', async () => {
+  let finish!: (response: object) => void; post.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  render(<NotificationsProvider><MonitoringPanel siteId="s" verified onShowAnalysis={show} /></NotificationsProvider>);
+  fireEvent.click(screen.getByRole('button', { name: 'Programación y alertas' })); await screen.findByText('Sin programación configurada.');
+  fireEvent.change(screen.getByLabelText('Frecuencia'), { target: { value: '1440' } }); fireEvent.click(screen.getByRole('button', { name: 'Guardar programación' }));
+  expect(screen.getByText('Guardando la programación del sitio…')).toBeInTheDocument();
+  expect(screen.queryByText(/Programación guardada/)).not.toBeInTheDocument(); fireEvent.click(screen.getByRole('button', { name: 'Guardar programación' })); expect(post).toHaveBeenCalledTimes(1);
+  await act(async () => { finish({ ok: true }); });
+  expect(within(screen.getByRole('complementary', { name: 'Notificaciones' })).getByText(/Programación guardada/)).toBeInTheDocument();
 });

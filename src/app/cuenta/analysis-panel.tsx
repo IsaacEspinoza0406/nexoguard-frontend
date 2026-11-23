@@ -6,6 +6,7 @@ import { csrfMutation, getAnalyses } from '../../lib/auth-api';
 import AnalysisComparison, { Guidance, Recommendation } from './analysis-comparison';
 import MonitoringPanel from './monitoring-panel';
 import SslLabsPanel from './ssl-labs-panel';
+import { Icon, StatusBadge } from '../../components/ui';
 
 type Job = { id: string; estado: string; creadoEn: string; motivoFallo: string | null };
 type Result = { codigoComprobacion: string; estado: string; evidencia: Record<string, unknown> | null; observadoEn: string; guidance?: Guidance | null };
@@ -16,6 +17,7 @@ const names: Record<string, string> = { HTTP_REDIRECT: 'Redirección HTTP a HTTP
 export default function AnalysisPanel({ siteId, verified }: { siteId: string; verified: boolean }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,7 +35,7 @@ export default function AnalysisPanel({ siteId, verified }: { siteId: string; ve
       const value: unknown = await response.json();
       if (!Array.isArray(value) || !value.every(v => v && typeof v.id === 'string' && typeof v.estado === 'string' && typeof v.creadoEn === 'string')) throw new Error();
       if (live) setJobs(value);
-    }).catch(() => { if (live) setError('No se pudo cargar el historial. Inténtalo de nuevo.'); });
+    }).catch(() => { if (live) setError('No se pudo cargar el historial. Inténtalo de nuevo.'); }).finally(() => { if (live) setLoadingHistory(false); });
     return () => { live = false; };
   }, [expanded, siteId, refresh, router]);
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function AnalysisPanel({ siteId, verified }: { siteId: string; ve
       const body = await response.json();
       if (!body || typeof body.id !== 'string') throw new Error();
       setJobs(previous => [{ id: body.id, estado: 'PENDIENTE', creadoEn: new Date().toISOString(), motivoFallo: null }, ...previous]);
-      setExpanded(true); setRefresh(value => value + 1); setMessage('Análisis solicitado. Puedes consultar su estado e historial.');
+      setExpanded(true); setLoadingHistory(true); setRefresh(value => value + 1); setMessage('Análisis solicitado. Puedes consultar su estado e historial.');
     } catch { setError('No se pudo conectar con el motor de análisis.'); }
     finally { setBusy(false); }
   }
@@ -72,17 +74,16 @@ export default function AnalysisPanel({ siteId, verified }: { siteId: string; ve
   }
 
   return <section className="analysis-panel" aria-label="Análisis del sitio">
-    <h4>Análisis manual</h4><p className="help">Revisión anónima de la página principal. Una comprobación aprobada no garantiza la ausencia de vulnerabilidades.</p>
-    <MonitoringPanel siteId={siteId} verified={verified} onShowAnalysis={id => void show(id)} />
-    <SslLabsPanel siteId={siteId} verified={verified} />
-    {!verified && <p>Verifica la propiedad vigente del dominio para iniciar un análisis.</p>}
-    <button className="submit" disabled={!verified || busy || active} onClick={() => void start()}>{busy ? 'Procesando…' : 'Iniciar análisis manual'}</button>
-    <button className="text-button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Ocultar historial' : 'Ver historial'}</button>
+    <div className="analysis-heading"><h4><Icon name="activity" />Análisis manual</h4><span className="section-kicker">MOTOR PROPIO · NEXOGUARD</span></div><p className="help">Revisión anónima de la página principal. Una comprobación aprobada no garantiza la ausencia de vulnerabilidades.</p>
+    {!verified && <p className="help"><Icon name="lock" /> Verifica la propiedad vigente del dominio para iniciar un análisis.</p>}
+    <div className="action-row"><button className="submit" disabled={!verified || busy || active} onClick={() => void start()}><Icon name="activity" />{busy ? 'Procesando…' : 'Iniciar análisis manual'}</button>
+    <button className="text-button" aria-expanded={expanded} aria-controls={`history-${siteId}`} onClick={() => { if (!expanded) setLoadingHistory(true); setExpanded(value => !value); }}><Icon name="clock" />{expanded ? 'Ocultar historial' : 'Ver historial'}</button></div>
     <p role="status">{message}</p><div role="alert">{error && <p className="form-error">{error}</p>}</div>
-    {expanded && <div><h4>Historial (últimos 50)</h4><button className="text-button" onClick={() => { setError(''); setRefresh(value => value + 1); }}>Actualizar historial</button>{!jobs.length && <p>No hay análisis registrados.</p>}
-      <ul>{jobs.map(job => <li key={job.id}><time>{new Date(job.creadoEn).toLocaleString('es-MX')}</time> — <strong>{labels[job.estado] || job.estado}</strong>{job.motivoFallo && <p>{job.motivoFallo}</p>} <button className="text-button" disabled={busy} onClick={() => void show(job.id)}>Ver resultados</button></li>)}</ul>
+    {expanded && <div className="history-section" id={`history-${siteId}`}><h4>Historial (últimos 50)</h4><button className="text-button" onClick={() => { setError(''); setLoadingHistory(true); setRefresh(value => value + 1); }}>Actualizar historial</button>{loadingHistory && <p className="loading-state" role="status">Cargando historial…</p>}{!loadingHistory && !jobs.length && !error && <div className="empty-state"><Icon name="clock" /><p>No hay análisis registrados.</p></div>}
+      <ul className="history-list">{jobs.map(job => <li key={job.id}><time>{new Date(job.creadoEn).toLocaleString('es-MX')}</time><StatusBadge status={job.estado}>{labels[job.estado] || job.estado}</StatusBadge>{job.motivoFallo && <p>{job.motivoFallo}</p>}<button className="text-button" disabled={busy} onClick={() => void show(job.id)}>Ver resultados</button></li>)}</ul>
       <AnalysisComparison key={siteId} siteId={siteId} jobs={jobs} names={names} />
     </div>}
-    {detail && <div aria-label="Resultados del análisis"><h4>Resultados — {labels[detail.estado] || detail.estado}</h4>{detail.motivoFallo && <p>{detail.motivoFallo}</p>}<ul className="analysis-results">{detail.resultados.map(result => <li key={result.codigoComprobacion}><h5>{names[result.codigoComprobacion] || result.codigoComprobacion}</h5><strong>{labels[result.estado] || result.estado}</strong><p>Evidencia observada:</p><dl>{Object.entries(result.evidencia || {}).filter(([key, value]) => key !== 'recommendation' && ['string', 'number', 'boolean'].includes(typeof value)).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl>{result.guidance && <Recommendation guidance={result.guidance} />}{!result.guidance && typeof result.evidencia?.recommendation === 'string' && <p><strong>Recomendación y comprobación:</strong> {result.evidencia.recommendation}</p>}<p className="help">Observado: {new Date(result.observadoEn).toLocaleString('es-MX')}</p></li>)}</ul></div>}
+    {detail && <section className="results-section" aria-label="Resultados del análisis"><h4>Resultados — {labels[detail.estado] || detail.estado}</h4><p className="help">Evidencia propia de NexoGuard. Abre cada comprobación para consultar el detalle y sus recomendaciones.</p>{detail.motivoFallo && <p>{detail.motivoFallo}</p>}<ul className="analysis-results">{detail.resultados.map(result => <li key={result.codigoComprobacion}><details><summary><span className="check-title"><h5>{names[result.codigoComprobacion] || result.codigoComprobacion}</h5><StatusBadge status={result.estado}>{labels[result.estado] || result.estado}</StatusBadge></span></summary><div className="check-body"><p>Evidencia observada:</p><dl>{Object.entries(result.evidencia || {}).filter(([key, value]) => key !== 'recommendation' && ['string', 'number', 'boolean'].includes(typeof value)).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}</dl>{result.guidance && <Recommendation guidance={result.guidance} />}{!result.guidance && typeof result.evidencia?.recommendation === 'string' && <p><strong>Recomendación y comprobación:</strong> {result.evidencia.recommendation}</p>}<p className="help">Observado: {new Date(result.observadoEn).toLocaleString('es-MX')}</p></div></details></li>)}</ul></section>}
+    <div className="tool-disclosures"><MonitoringPanel siteId={siteId} verified={verified} onShowAnalysis={id => void show(id)} /><SslLabsPanel siteId={siteId} verified={verified} /></div>
   </section>;
 }

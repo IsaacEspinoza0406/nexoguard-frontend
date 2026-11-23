@@ -42,8 +42,8 @@ export default function SslLabsPanel({ siteId, verified }: { siteId: string; ver
     finally { setBusy(false); }
   }
   return <section aria-label="SSL Labs complementario">
-    <button className="text-button" aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? 'Ocultar SSL Labs' : 'SSL Labs complementario'}</button>
-    {open && <div><h4>SSL Labs · evaluación externa complementaria</h4>
+    <button className="text-button" aria-controls={`provider-${siteId}`} aria-expanded={open} onClick={() => setOpen(v => !v)}>{open ? 'Ocultar SSL Labs' : 'SSL Labs complementario'}</button>
+    {open && <div id={`provider-${siteId}`}><h4>SSL Labs · evaluación externa complementaria</h4>
       <p>Qualys recibirá el dominio y realizará las conexiones desde sus servidores. No se envían tus cookies, sesión ni contraseña. No se publica el informe en su tablón público; esto no significa que el dominio sea confidencial para Qualys.</p>
       <p>Se solicitan informes con caché máxima de 24 horas. Si no hay informe, el proveedor puede iniciar una evaluación. Sus notas no son puntuaciones propias de NexoGuard ni sustituyen sus comprobaciones.</p>
       {error && <p role="alert">{error}</p>}{refreshError && <p role="alert">{refreshError}</p>}<p role="status">{message}</p>
@@ -61,7 +61,7 @@ export default function SslLabsPanel({ siteId, verified }: { siteId: string; ver
         {job.report?.testTime && <p>Fecha de evaluación del proveedor: {new Date(job.report.testTime).toLocaleString('es-MX')}</p>}
         {(job.motivoFallo || job.report?.reason) && <p>{job.motivoFallo || job.report?.reason}</p>}
         {['PENDIENTE', 'EN_EJECUCION'].includes(job.estado) && <p>Próxima consulta no antes de {new Date(job.disponibleEn).toLocaleString('es-MX')}. La evaluación puede tardar varios minutos; los resultados propios no dependen de ella.</p>}
-        {job.report && <><p>Motor del proveedor: {job.report.engineVersion || 'No informado'} · Criterios: {job.report.criteriaVersion || 'No informados'}</p><ul>{job.report.endpoints.map(endpoint => <li key={endpoint.endpoint}>Endpoint {endpoint.endpoint}: {endpoint.status === 'READY' ? `Nota del proveedor: ${endpoint.grade ?? 'No informada'}` : endpoint.status === 'ERROR' ? 'No pudo evaluarse' : 'Pendiente'}{endpoint.hasWarnings ? ' · Advertencias del proveedor' : ''}</li>)}</ul></>}
+        {job.report && <><p>Motor del proveedor: {job.report.engineVersion || 'No informado'} · Criterios: {job.report.criteriaVersion || 'No informados'}</p><ul className="provider-endpoints">{job.report.endpoints.map(endpoint => <li key={endpoint.endpoint}>Endpoint {endpoint.endpoint}: {endpoint.status === 'READY' ? `Nota del proveedor: ${endpoint.grade ?? 'No informada'}` : endpoint.status === 'ERROR' ? 'No pudo evaluarse' : 'Pendiente'}{endpoint.hasWarnings ? ' · Advertencias del proveedor' : ''}</li>)}</ul></>}
       </li>)}</ul>
     </div>}
   </section>;

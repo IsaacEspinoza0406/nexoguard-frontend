@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import LogoutButton from './logout-button';
 import SitesManager from './sites-manager';
+import { Brand, Icon } from '../../components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,10 +13,16 @@ export default async function Account() {
   let response: Response;
   try {
     response = await fetch(`${process.env.API_INTERNAL_URL || 'http://127.0.0.1:3001'}/auth/me`, { cache: 'no-store', headers: { Cookie: `${token.name}=${token.value}` } });
-  } catch { return <main className="form-area"><p role="alert">No se pudo comprobar tu sesión. Vuelve a cargar la página.</p></main>; }
+  } catch { return <main className="session-error"><p role="alert">No se pudo comprobar tu sesión. Vuelve a cargar la página.</p></main>; }
   if (response.status === 401) redirect('/login');
-  if (!response.ok) return <main className="form-area"><p role="alert">El servicio no está disponible. Inténtalo más tarde.</p></main>;
+  if (!response.ok) return <main className="session-error"><p role="alert">El servicio no está disponible. Inténtalo más tarde.</p></main>;
   const user: unknown = await response.json();
   if (!user || typeof user !== 'object' || !('email' in user) || typeof user.email !== 'string') throw new Error('Respuesta de sesión inválida.');
-  return <main className="form-area" style={{ minHeight: '100vh' }}><section className="form-card account-card"><p className="step">NEXOGUARD · ÁREA PRIVADA</p><h1>Tu cuenta</h1><p className="description">Sesión iniciada como {user.email}.</p><LogoutButton /><SitesManager /></section></main>;
+  return <div className="dashboard">
+    <a className="skip-link" href="#main-content">Saltar al contenido</a>
+    <aside className="sidebar"><Brand /><nav aria-label="Navegación del espacio de trabajo"><p className="nav-caption">ESPACIO DE TRABAJO</p><div className="workspace-nav"><a href="#sites-heading" aria-current="page"><Icon name="grid" />Mis sitios</a><a href="#add-site"><Icon name="plus" />Agregar sitio</a></div></nav><div className="sidebar-bottom"><strong>NexoGuard</strong>Proyecto universitario<br />Revisión de seguridad web</div></aside>
+    <div className="workspace"><header className="workspace-bar"><div className="breadcrumb"><Icon name="grid" /> Espacio de trabajo <span>/ Mis sitios</span></div><div className="account-menu"><div className="account-identity">Sesión iniciada como<strong>{user.email}</strong></div><LogoutButton /></div></header>
+      <main className="workspace-content" id="main-content"><header className="dashboard-heading"><div><p className="eyebrow">CENTRO DE REVISIÓN</p><h1>Tu cuenta</h1><p>Una vista clara de tus sitios, su evidencia y los próximos pasos.</p></div><a className="button-secondary" href="#add-site"><Icon name="plus" /> Agregar sitio</a></header><SitesManager /></main>
+    </div>
+  </div>;
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAnalysisComparison } from '../../lib/auth-api';
+import { StatusBadge } from '../../components/ui';
 
 export type Guidance = { version: string; explanation: string; consequence: string; applicability: string; correctiveAction: string; verification: string };
 export function Recommendation({ guidance }: { guidance: Guidance }) {
@@ -40,7 +41,7 @@ export default function AnalysisComparison({ siteId, jobs, names }: { siteId: st
     finally { setBusy(false); }
   }
   function select(value: string, baseline: boolean) { if (baseline) setBefore(value); else setAfter(value); setRows(null); setError(''); }
-  return <section aria-label="Comparación de análisis">
+  return <section className="comparison-section" aria-label="Comparación de análisis">
     <h4>Comparar análisis</h4>
     <p className="help">Selecciona dos análisis de la misma revisión, del más antiguo al más reciente. Los fallos, las comprobaciones no evaluadas y los datos ausentes no prueban mejoras. No hay una puntuación global.</p>
     <label htmlFor={`before-${siteId}`}>Análisis base (anterior)</label>
@@ -50,7 +51,7 @@ export default function AnalysisComparison({ siteId, jobs, names }: { siteId: st
     <button className="text-button" disabled={busy || !before || !after || before === after} onClick={() => void compare()}>{busy ? 'Comparando…' : 'Comparar selección'}</button>
     {error && <p role="alert">{error}</p>}
     {rows && <div aria-live="polite"><h5>Comparación por comprobación</h5><ul className="analysis-results">{rows.map(row => <li key={row.code}>
-      <h5>{names[row.code] || row.code}</h5><strong>{labels[row.change]}</strong>
+      <h5>{names[row.code] || row.code}</h5><StatusBadge status={row.change}>{labels[row.change]}</StatusBadge>
       <p>Anterior: {row.before ? labels[row.before] || row.before : 'Sin datos'} → Posterior: {row.after ? labels[row.after] || row.after : 'Sin datos'}</p><p>{row.reason}</p>
       {row.guidance && <details><summary>Explicación y recomendación</summary><Recommendation guidance={row.guidance} /></details>}
     </li>)}</ul></div>}
