@@ -126,3 +126,16 @@ select { display: block; margin: 8px 0 15px; max-width: 100%; font-size: 12px; }
 @keyframes toast-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @media(max-width:600px) { .toast-region { right: 12px; bottom: max(12px,env(safe-area-inset-bottom)); width: calc(100vw - 24px); max-height: 45dvh; }.toast { padding: 13px 10px 13px 13px; }.toast-close { min-width: 36px; min-height: 36px; }.verification-steps { grid-template-columns: 1fr; gap: 8px; }.verification-steps >li { padding: 12px; } }
 @media(prefers-reduced-motion:reduce) { .toast { animation: none; } }
+
+/* Practical guides: scroll code inside its panel, never the page. */
+.practical-guide { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); min-width: 0; }
+.practical-guide h6 { font-size: 14px; margin: 16px 0 10px; color: var(--text); }
+.practical-guide label { display: block; margin: 16px 0 8px; }
+.practical-guide select { width: 100%; max-width: 420px; }
+.guide-notice { border-left: 3px solid #69d7b7; padding: 10px 14px; background: #132b2d; color: #d2e8e3; line-height: 1.65; }
+.guide-code-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
+.guide-code-grid >div,.guide-content { min-width: 0; }
+.practical-guide pre { max-width: 100%; overflow: auto; background: #090f1b; border: 1px solid var(--line); border-radius: 10px; padding: 15px; font-size: 12px; line-height: 1.75; color: #c5eddf; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.practical-guide pre:focus-visible { outline: 2px solid #69d7b7; outline-offset: 3px; }
+.practical-guide ol { padding-left: 24px; list-style: decimal; }.practical-guide li { margin: 10px 0; line-height: 1.7; }
+@media(max-width:1000px) { .guide-code-grid { grid-template-columns: minmax(0,1fr); } }

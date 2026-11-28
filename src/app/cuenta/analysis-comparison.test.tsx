@@ -47,5 +47,5 @@ it('muestra espera, errores seguros y sesión caducada', async () => {
 });
 it('presenta los cinco elementos RF-011 separados de la evidencia', () => {
   render(<Recommendation guidance={guidance} />);
-  for (const text of ['Explicación', 'Posible consecuencia', 'Cuándo aplica', 'Acción correctiva', 'Cómo comprobarla']) expect(screen.getByText(text)).toBeInTheDocument();
+  for (const text of ['Explicación', 'Posible consecuencia', 'Cuándo aplica', 'Acción orientativa según aplicabilidad', 'Cómo comprobarla']) expect(screen.getByText(text)).toBeInTheDocument();
 });

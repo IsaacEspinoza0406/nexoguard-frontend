@@ -4,17 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAnalysisComparison } from '../../lib/auth-api';
 import { StatusBadge } from '../../components/ui';
+import PracticalGuide, { PracticalGuideData } from './practical-guide';
 
-export type Guidance = { version: string; explanation: string; consequence: string; applicability: string; correctiveAction: string; verification: string };
-export function Recommendation({ guidance }: { guidance: Guidance }) {
-  return <dl className="recommendation">
+export type Guidance = { version: string; explanation: string; consequence: string; applicability: string; correctiveAction: string; verification: string; practical?: PracticalGuideData };
+export function Recommendation({ guidance, status }: { guidance: Guidance; status?: string | null }) {
+  return <>{(status === 'NO_EVALUADO' || status === 'NO_APLICABLE') && <p className="guide-notice">{status === 'NO_APLICABLE' ? 'Sin condición aplicable en la respuesta observada.' : 'No hay evidencia suficiente para concluir si requiere una corrección.'} Consulta primero la evidencia y las condiciones; una guía no cambia este resultado.</p>}<dl className="recommendation">
     <div><dt>Explicación</dt><dd>{guidance.explanation}</dd></div>
     <div><dt>Posible consecuencia</dt><dd>{guidance.consequence}</dd></div>
     <div><dt>Cuándo aplica</dt><dd>{guidance.applicability}</dd></div>
-    <div><dt>Acción correctiva</dt><dd>{guidance.correctiveAction}</dd></div>
+    <div><dt>Acción orientativa según aplicabilidad</dt><dd>{guidance.correctiveAction}</dd></div>
     <div><dt>Cómo comprobarla</dt><dd>{guidance.verification}</dd></div>
     <div><dt>Catálogo orientativo actual</dt><dd>{guidance.version}; separado de las reglas históricas.</dd></div>
-  </dl>;
+  </dl>{guidance.practical && <PracticalGuide guide={guidance.practical} status={status} />}</>;
 }
 type Job = { id: string; estado: string; creadoEn: string };
 type Row = { code: string; before: string | null; after: string | null; change: string; reason: string; guidance: Guidance | null };
@@ -53,7 +54,7 @@ export default function AnalysisComparison({ siteId, jobs, names }: { siteId: st
     {rows && <div aria-live="polite"><h5>Comparación por comprobación</h5><ul className="analysis-results">{rows.map(row => <li key={row.code}>
       <h5>{names[row.code] || row.code}</h5><StatusBadge status={row.change}>{labels[row.change]}</StatusBadge>
       <p>Anterior: {row.before ? labels[row.before] || row.before : 'Sin datos'} → Posterior: {row.after ? labels[row.after] || row.after : 'Sin datos'}</p><p>{row.reason}</p>
-      {row.guidance && <details><summary>Explicación y recomendación</summary><Recommendation guidance={row.guidance} /></details>}
+      {row.guidance && <details><summary>Explicación y recomendación</summary><Recommendation guidance={row.guidance} status={row.after} /></details>}
     </li>)}</ul></div>}
   </section>;
 }
