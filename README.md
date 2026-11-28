@@ -123,29 +123,32 @@ docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_URL=/api -t nexo
 
 Esta imagen necesita un proxy que dirija `/api/` al backend; el argumento no crea el proxy. Para ejecutar el navegador directamente contra la API local, compila con su URL pública local en lugar de `/api`. `API_INTERNAL_URL` se configura al arrancar el contenedor para SSR y debe ser accesible desde la red de Next.js.
 
-La aplicación real está publicada en **https://nexoguard.duckdns.org**, sobre AWS EC2 Ubuntu 24.04 LTS x86_64 con Docker Compose. Nginx termina HTTPS con certificado renovable y redirección desde HTTP, sirve el frontend en `/` y la API en `/api/`. La imagen pública utiliza `NEXT_PUBLIC_API_URL=/api`; el servidor Next.js utiliza `API_INTERNAL_URL=http://back:3001` en la red interna. Next.js, NestJS y MySQL no publican sus puertos directamente a Internet.
+La aplicación real está publicada en **https://nexoguard.duckdns.org**, sobre AWS EC2 Ubuntu 24.04 LTS x86_64 con Docker Compose. Nginx termina HTTPS con certificado renovable y redirección desde HTTP, sirve el frontend en `/` y la API en `/api/`. La imagen pública utiliza `NEXT_PUBLIC_API_URL=/api`; la versión anterior publicada utilizaba `API_INTERNAL_URL=http://back:3001`; la actualización preparada exige `https://back:3001` con CA validada. Esta actualización no se ha desplegado todavía. Next.js, NestJS y MySQL no publican sus puertos directamente a Internet.
 
 El gateway de EC2 se construye con [docker/Dockerfile.ec2-gateway](./docker/Dockerfile.ec2-gateway) y sus [plantillas](./docker/ec2/). La orquestación completa y la configuración privada se administran separadamente, fuera de los repositorios de aplicación; construir esta imagen no despliega toda la plataforma. Los cambios de frontend se publican conservando una imagen anterior para reversión, sin necesidad de reiniciar MySQL.
 
-## TLS y evidencia de infraestructura
+## TLS interno de la versión preparada
 
-HTTPS se termina en Nginx, no en un segundo servidor HTTPS de Next.js. La configuración pública ya incluida permite comprobarlo:
+El [arranque HTTPS](./server.mjs) utiliza el manejador de Next sin cambiar rutas, autenticación, SSR ni CSP. Es un servidor HTTPS mínimo porque `next start` no expone HTTPS de producción. La imagen Docker lo utiliza por defecto; `npm run dev` y `npm start` conservan el desarrollo local HTTP. Para este último configura `NEXOGUARD_HTTP_MODE=local` explícitamente; no trasladar ese modo a producción.
 
-- [TLS de Nginx](./docker/ec2/tls.conf.template): TLS 1.2/1.3, certificado y clave montados, redirección 308 desde HTTP y proxy de `/api/`. La ruta del archivo público de Search Console se conserva.
-- [Arranque del gateway](./docker/ec2/entrypoint.sh): selecciona la plantilla y valida certificados y sintaxis. El modo sin TLS se limita al [bootstrap ACME](./docker/ec2/bootstrap.conf.template), que responde 503 para la aplicación y no sirve formularios de acceso por HTTP.
-- [Imagen del gateway](./docker/Dockerfile.ec2-gateway): incorpora las plantillas sin certificados privados.
+Producción requiere `NEXOGUARD_INTERNAL_TLS_CERT` y `NEXOGUARD_INTERNAL_TLS_KEY` montados privadamente, `NODE_EXTRA_CA_CERTS` con la CA web y `API_INTERNAL_URL=https://back:3001`. No son variables `NEXT_PUBLIC_`. El certificado del frontend debe incluir SAN `front` y el backend SAN `back`. El proceso falla si falta la configuración; no usa opciones para ignorar certificados.
 
-| Tramo | Cifrado y alcance |
+La [plantilla Nginx](./docker/ec2/tls.conf.template) mantiene HTTPS público, redirección, ACME y archivo Google. Los upstreams son HTTPS con `proxy_ssl_verify on`, CA y nombres/SNI fijos `front`/`back`. El [entrypoint](./docker/ec2/entrypoint.sh) comprueba montajes y ejecuta `nginx -t`. La [imagen gateway](./docker/Dockerfile.ec2-gateway) no incluye certificados privados. Su modo bootstrap responde 503 para la aplicación; no sirve login por HTTP.
+
+| Tramo | Configuración preparada |
 | --- | --- |
-| Navegador → Nginx | HTTPS público, certificado validado; HTTP redirige a HTTPS. |
-| Nginx → Next.js / NestJS | HTTP en la red Docker interna de la misma EC2. No hay TLS en esos saltos; la red interna no constituye cifrado. |
-| Next.js SSR → NestJS | HTTP interno a `back:3001`, sin publicación directa de ese puerto. |
-| NestJS → MySQL y transporte | TLS con CA y nombre esperado, según la configuración pública seleccionada en el backend. |
-| Transporte → servicios HTTPS externos | Validación estricta; excepción limitada al diagnóstico sin datos de aplicación descrita en el backend. |
+| Navegador → Nginx | Certificado público y redirección HTTP → HTTPS |
+| Nginx → Next.js / NestJS | HTTPS con CA y nombre de servicio validados |
+| SSR → NestJS | HTTPS y CA adicional de Node cargada al inicio |
+| NestJS → MySQL / transporte | TLS existente, preservado sin rotar su CA |
 
-El [README del backend](https://github.com/IsaacEspinoza0406/nexoguard-backend) contiene el diagnóstico, las pruebas negativas y un ejemplo Compose público en `docker/ec2/`. No deben exponerse los tramos HTTP internos ni extenderlos a otro host sin proteger el canal. No se afirma TLS de extremo a extremo entre todos los contenedores.
+**La topología nueva está preparada para validación/despliegue manual; no está aplicada en EC2.** El HTTPS público de la versión anterior no acreditaba cifrado de estos saltos internos. El [procedimiento del backend](https://github.com/IsaacEspinoza0406/nexoguard-backend/blob/main/docker/ec2/INTERNAL_TLS.md) incluye montajes, generación, respaldo y reversión. La activación inicial actualiza cuatro servicios (incluye el transporte con dependencias corregidas); las renovaciones de hojas de 90 días recrean solo backend/frontend/gateway. Su timer systemd está preparado y validado localmente, todavía no instalado en EC2. No hay migraciones. El HTTP de desarrollo local, ACME/salud y la comprobación anónima de redirección siguen identificados por su finalidad.
 
-El 27/11/2026 se comprobó la URL pública con TLS 1.3, validación normal y respuesta 200; HTTP respondió 308. La plantilla aprobó `nginx -t` en un contenedor aislado, sin publicar puertos. No se desplegó ni se modificó Nginx en EC2. La comprobación actual de las conexiones internas remotas queda pendiente de acceso SSH; revisar archivos no demuestra por sí solo su estado efectivo en producción. Esto no resuelve ni cambia el estado pendiente del reporte de Safe Browsing.
+## Ejemplos prácticos de corrección
+
+El detalle de resultados y la comparación presentan las doce guías `practical-v1` suministradas por el backend. El [componente compartido](./src/app/cuenta/practical-guide.tsx) permite elegir tecnología, consultar ubicación, antes ilustrativo, configuración o procedimiento, aplicación y comprobación. Copia únicamente el bloque corregido y confirma después de que el portapapeles acepte la operación; si falla, mantiene una alternativa manual visible. No almacena tokens ni contraseñas.
+
+Las guías no identifican la tecnología de un sitio por inferencia. Los resultados no aplicables/no evaluados se explican antes de modificar nada; un resultado aprobado no exige cambios por el ejemplo. HSTS usa 300 segundos de laboratorio sin subdominios/preload implícitos; cookies usa NestJS/Express y una cookie ficticia; CSP es contextual, no una receta universal. Los catálogos orientativos no cambian evidencia ni resultados históricos.
 
 ## Límites y pendientes
 
