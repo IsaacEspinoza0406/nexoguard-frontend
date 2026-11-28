@@ -1,9 +1,17 @@
 # NexoGuard — Frontend
 
+<img src="./logo.png" width="96" height="96" alt="Escudo de NexoGuard" />
+
 NexoGuard es una aplicación universitaria de revisión de seguridad web para propietarios de sitios. Permite acreditar control de un dominio, consultar análisis de su página principal y entender evidencia y recomendaciones. Una comprobación aprobada no garantiza que un sitio carezca de vulnerabilidades.
 
 - **Aplicación desplegada:** https://nexoguard.duckdns.org
 - **Backend complementario:** https://github.com/IsaacEspinoza0406/nexoguard-backend
+
+## Vista previa
+
+![Pantalla real de registro de NexoGuard, con campos vacíos y sin datos de cuentas](./preview.png)
+
+Captura real del frontend; no representa resultados de análisis ni contiene datos de una cuenta.
 
 ## Funcionalidades implementadas
 
@@ -118,6 +126,26 @@ Esta imagen necesita un proxy que dirija `/api/` al backend; el argumento no cre
 La aplicación real está publicada en **https://nexoguard.duckdns.org**, sobre AWS EC2 Ubuntu 24.04 LTS x86_64 con Docker Compose. Nginx termina HTTPS con certificado renovable y redirección desde HTTP, sirve el frontend en `/` y la API en `/api/`. La imagen pública utiliza `NEXT_PUBLIC_API_URL=/api`; el servidor Next.js utiliza `API_INTERNAL_URL=http://back:3001` en la red interna. Next.js, NestJS y MySQL no publican sus puertos directamente a Internet.
 
 El gateway de EC2 se construye con [docker/Dockerfile.ec2-gateway](./docker/Dockerfile.ec2-gateway) y sus [plantillas](./docker/ec2/). La orquestación completa y la configuración privada se administran separadamente, fuera de los repositorios de aplicación; construir esta imagen no despliega toda la plataforma. Los cambios de frontend se publican conservando una imagen anterior para reversión, sin necesidad de reiniciar MySQL.
+
+## TLS y evidencia de infraestructura
+
+HTTPS se termina en Nginx, no en un segundo servidor HTTPS de Next.js. La configuración pública ya incluida permite comprobarlo:
+
+- [TLS de Nginx](./docker/ec2/tls.conf.template): TLS 1.2/1.3, certificado y clave montados, redirección 308 desde HTTP y proxy de `/api/`. La ruta del archivo público de Search Console se conserva.
+- [Arranque del gateway](./docker/ec2/entrypoint.sh): selecciona la plantilla y valida certificados y sintaxis. El modo sin TLS se limita al [bootstrap ACME](./docker/ec2/bootstrap.conf.template), que responde 503 para la aplicación y no sirve formularios de acceso por HTTP.
+- [Imagen del gateway](./docker/Dockerfile.ec2-gateway): incorpora las plantillas sin certificados privados.
+
+| Tramo | Cifrado y alcance |
+| --- | --- |
+| Navegador → Nginx | HTTPS público, certificado validado; HTTP redirige a HTTPS. |
+| Nginx → Next.js / NestJS | HTTP en la red Docker interna de la misma EC2. No hay TLS en esos saltos; la red interna no constituye cifrado. |
+| Next.js SSR → NestJS | HTTP interno a `back:3001`, sin publicación directa de ese puerto. |
+| NestJS → MySQL y transporte | TLS con CA y nombre esperado, según la configuración pública seleccionada en el backend. |
+| Transporte → servicios HTTPS externos | Validación estricta; excepción limitada al diagnóstico sin datos de aplicación descrita en el backend. |
+
+El [README del backend](https://github.com/IsaacEspinoza0406/nexoguard-backend) contiene el diagnóstico, las pruebas negativas y un ejemplo Compose público en `docker/ec2/`. No deben exponerse los tramos HTTP internos ni extenderlos a otro host sin proteger el canal. No se afirma TLS de extremo a extremo entre todos los contenedores.
+
+El 27/11/2026 se comprobó la URL pública con TLS 1.3, validación normal y respuesta 200; HTTP respondió 308. La plantilla aprobó `nginx -t` en un contenedor aislado, sin publicar puertos. No se desplegó ni se modificó Nginx en EC2. La comprobación actual de las conexiones internas remotas queda pendiente de acceso SSH; revisar archivos no demuestra por sí solo su estado efectivo en producción. Esto no resuelve ni cambia el estado pendiente del reporte de Safe Browsing.
 
 ## Límites y pendientes
 
