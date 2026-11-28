@@ -5,6 +5,7 @@ case "$PUBLIC_HOST" in *[!a-z0-9.-]*|'') echo 'Invalid hostname' >&2; exit 1 ;; 
 case "${TLS_ENABLED:-false}" in
   false) template=/etc/nexoguard/bootstrap.conf.template ;;
   true)
+    test -r /run/internal-tls/ca.pem
     test -r "/etc/letsencrypt/live/$PUBLIC_HOST/fullchain.pem"
     test -r "/etc/letsencrypt/live/$PUBLIC_HOST/privkey.pem"
     template=/etc/nexoguard/tls.conf.template ;;

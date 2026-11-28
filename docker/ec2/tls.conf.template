@@ -33,11 +33,17 @@ server {
   proxy_set_header Forwarded '';
   proxy_set_header Proxy '';
   proxy_redirect off;
+  # Trust a dedicated internal CA; SNI/name are fixed service identities, not Host input.
+  proxy_ssl_verify on;
+  proxy_ssl_trusted_certificate /run/internal-tls/ca.pem;
+  proxy_ssl_verify_depth 2;
+  proxy_ssl_server_name on;
+  proxy_ssl_protocols TLSv1.2 TLSv1.3;
   proxy_connect_timeout 5s;
   proxy_read_timeout 55s;
   proxy_send_timeout 15s;
   location = /health/live { return 200 'ok'; }
-  location = /health/ready { set $api http://back:3001; proxy_pass $api/health/ready; }
+  location = /health/ready { set $api https://back:3001; proxy_ssl_name back; proxy_pass $api/health/ready; }
   # Public ownership proof supplied by Google; no private files in this webroot.
   location = /google9ba5ca0ab47e9b8d.html {
     root /var/www/acme/search-console;
@@ -46,12 +52,13 @@ server {
     expires -1;
   }
   location /api/ {
-    set $api http://back:3001;
+    set $api https://back:3001;
+    proxy_ssl_name back;
     rewrite ^/api/(.*)$ /$1 break;
     proxy_pass $api;
     proxy_cookie_path /users /api/users;
     proxy_no_cache 1;
     proxy_cache_bypass 1;
   }
-  location / { set $frontend http://front:3000; proxy_pass $frontend; }
+  location / { set $frontend https://front:3000; proxy_ssl_name front; proxy_pass $frontend; }
 }

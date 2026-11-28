@@ -12,7 +12,9 @@ export default async function Account() {
   if (!token || !/^[0-9a-f]{64}$/.test(token.value)) redirect('/login');
   let response: Response;
   try {
-    response = await fetch(`${process.env.API_INTERNAL_URL || 'http://127.0.0.1:3001'}/auth/me`, { cache: 'no-store', headers: { Cookie: `${token.name}=${token.value}` } });
+    const api = new URL(process.env.API_INTERNAL_URL || 'http://127.0.0.1:3001');
+    if (process.env.NODE_ENV === 'production' && process.env.NEXOGUARD_HTTP_MODE !== 'local' && (api.protocol !== 'https:' || !process.env.NODE_EXTRA_CA_CERTS)) throw new Error('INTERNAL_API_HTTPS_REQUIRED');
+    response = await fetch(`${api.origin}/auth/me`, { cache: 'no-store', headers: { Cookie: `${token.name}=${token.value}` } });
   } catch { return <main className="session-error"><p role="alert">No se pudo comprobar tu sesión. Vuelve a cargar la página.</p></main>; }
   if (response.status === 401) redirect('/login');
   if (!response.ok) return <main className="session-error"><p role="alert">El servicio no está disponible. Inténtalo más tarde.</p></main>;
